@@ -12,5 +12,7 @@ def do_connect():
         while not sta_if.isconnected():
             pass
     print('network config:', sta_if.ifconfig())
+
+
 do_connect()
 gc.collect()

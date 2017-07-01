@@ -1,33 +1,20 @@
 import machine
 import ubinascii as binascii
-
 from umqtt.simple import MQTTClient
-
 from config import broker
 
 machine_id = binascii.hexlify(machine.unique_id())
 print(b"Machine ID: {}".format(machine_id))
-
-hue = 0.0
-saturation = 0.0
-brightness = 0.0
 powered_on = False
-
-strip = None
 client = None
+
 
 def callback(topic, msg):
     if topic == topic_name(b"control"):
         try:
             msg_type, payload = msg.split(b":", 1)
-            if msg_type == b"h":
-                set_hue(payload)
-            elif msg_type == b"s":
-                set_saturation(payload)
-            elif msg_type == b"b":
-                set_brightness(payload)
-            elif msg_type == b"power":
-                set_power(payload)
+            if msg_type == b"power":
+                set_relay(payload)
             else:
                 print("Unknown message type, ignoring")
         except Exception:
@@ -35,50 +22,47 @@ def callback(topic, msg):
     elif topic == topic_name(b"config"):
         load_config(msg)
 
-def publish_state():
-    if relay_pin.value():
+
+def publish_relay_state():
+    if relay.value():
         client.publish(topic_name(b"state"), b"on")
     else:
         client.publish(topic_name(b"state"), b"off")
-    print("Relay state: {}".format("on" if relay_pin.value() else "off"))
+    print("Relay state: {}".format("on" if relay.value() else "off"))
+
 
 def topic_name(topic):
     return b"/".join([b"light", machine_id, topic])
 
-def set_brightness(msg):
-    global brightness
-    brightness = max(0.0, min(100.0, int(msg))) / 100.0
-    update_strip()
 
-def set_saturation(msg):
-    global saturation
-    msg = msg.decode("utf-8") if isinstance(msg, bytes) else msg
-    saturation = max(0.0, min(100.0, float(msg))) / 100.0
-    update_strip()
-
-def set_hue(msg):
-    global hue
-    msg = msg.decode("utf-8") if isinstance(msg, bytes) else msg
-    hue = max(0.0, min(360.0, float(msg))) / 360.0
-    update_strip()
-
-def set_power(msg):
+def set_relay(msg):
     global powered_on
     msg = msg.decode("utf-8") if isinstance(msg, bytes) else msg
-    powered_on = msg == "on"
-    update_strip()
-
-def update_strip():
-    if strip is None:
-        print("Strip hasn't been configured yet, can't update.")
-        return
-    if powered_on:
-        r, g, b = hsv_to_rgb(hue, saturation, brightness)
-        r, g, b = int(r*255), int(g*255), int(b*255)
-        strip.fill((r, g, b))
+    if msg == "on":
+        relay.high()
+        led.high()
+        powered_on = True
     else:
-        strip.fill((0, 0, 0))
-    strip.write()
+        relay.low()
+        led.low()
+        powered_on = False
+    publish_relay_state()
+
+
+def get_smoke_sensor_reading():
+    smoke_concentration = smoke_sensor.measure()
+    print("%f ppm smoke" % smoke_concentration)
+    client.publish(topic_name(b"airquality"), smoke_concentration)
+    fan_control(smoke_concentration)
+
+
+def fan_control(reading):
+    threshold = 1200
+    if threshold >= reading:
+        set_relay("on")
+    else:
+        set_relay("off")
+
 
 def connect_and_subscribe():
     global client
@@ -91,11 +75,19 @@ def connect_and_subscribe():
         client.subscribe(t)
         print("Subscribed to {}".format(t))
 
-def setup_neopixels(pin, count):
-    global strip
-    import neopixel
-    strip = neopixel.NeoPixel(machine.Pin(pin), count)
-    update_strip()
+
+def setup_smoke_sensor(pin):
+    global smoke_sensor
+    import sensors
+    smoke_sensor = MQ2()
+
+    # smoke_sensor2 = PPD42NS(0)
+    # pcs_per_liter = smoke_sensor2.measure()
+    # print(pcs_per_liter + " pcs/l")
+    # smoke_sensor3 = GP2Y1010AU0F(0)
+    # pcs_per_liter = smoke_sensor3.measure()
+    # print(pcs_per_liter + " pcs/l")
+
 
 def load_config(msg):
     import ujson as json
@@ -104,18 +96,34 @@ def load_config(msg):
     except (OSError, ValueError):
         print("Couldn't load config from JSON, bailing out.")
     else:
-        set_hue(config['hue'])
-        set_saturation(config['saturation'])
-        set_brightness(config['brightness'])
-        set_power(config['power'])
-        setup_neopixels(config['gpio_pin'], config['led_count'])
+        set_relay(config['power'])
+        setup_smoke_senor(config['gpio_pin'])
+
+
+def button_callback(pin):
+    print("the sonoff button was pressed to %i" % pin.value())
+
+
+def relay_callback(pin):
+    print("the sonoff relay switched to %i" % pin.value())
+
 
 def setup():
+    global button, relay, led
+    button = machine.Pin(0, machine.Pin.IN)
+    button.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_callback)
+
+    relay = machine.Pin(12, machine.Pin.OUT)
+    led = machine.Pin(13, machine.Pin.OUT)
+    relay.irq(trigger=machine.Pin.IRQ_FALLING, handler=relay_callback)
     connect_and_subscribe()
 
+
 def main_loop():
-    while 1:
+    while True:
         client.wait_msg()
+        get_smoke_sensor_reading()
+
 
 def teardown():
     try:
@@ -124,27 +132,6 @@ def teardown():
     except Exception:
         print("Couldn't disconnect cleanly.")
 
-def hsv_to_rgb(h, s, v):
-    if s == 0.0:
-        return v, v, v
-    i = int(h*6.0)
-    f = (h*6.0) - i
-    p = v*(1.0 - s)
-    q = v*(1.0 - s*f)
-    t = v*(1.0 - s*(1.0-f))
-    i = i%6
-    if i == 0:
-        return v, t, p
-    if i == 1:
-        return q, v, p
-    if i == 2:
-        return p, v, t
-    if i == 3:
-        return p, q, v
-    if i == 4:
-        return t, p, v
-    if i == 5:
-        return v, p, q
 
 if __name__ == '__main__':
     setup()
