@@ -12,12 +12,12 @@ class GP2Y1010AU0F(object):
     -> need a voltage divider 5v to 1v
     """
 
-    __init__(self, pin)
-    self.sensor_led = machine.Pin(pin, machine.Pin.OUT)
-    self.adc = machine.ADC(0)
-    self.pre_sampling = 280
-    self.post_sampling = 40
-    self.end_of_cycle = 9680
+    def __init__(self, pin):
+        self.sensor_led = machine.Pin(pin, machine.Pin.OUT)
+        self.adc = machine.ADC(0)
+        self.pre_sampling = 280
+        self.post_sampling = 40
+        self.end_of_cycle = 9680
 
     def measure(self):
         self.sensor_led.low()  # turn on the LED
@@ -47,7 +47,7 @@ class PPD42NS(object):
     Particle size: 1.0 um
     Concentration 0 - 28,000 pcs/liter
     """
-    __init__(self, pin):
+    def __init__(self, pin):
         self.pin = machine.Pin(pin, machine.Pin.IN)
         self.sample_time = 30000  # 30s in millis
         self.low_pulse_occupancy = 0
@@ -85,7 +85,7 @@ class MQ2:
     Code adopted from http://sandboxelectronics.com/?p=165
     """
 
-    __init__(self, adc):
+    def __init__(self, adc):
         self.r_0_clean_air_factor = 9.83  # from the datasheet
         self.r_load_resistor = 5.0  # on the board in kOhm
         self.smoke_curve = [2.3, 0.53, -0.44]
