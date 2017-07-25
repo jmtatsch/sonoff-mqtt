@@ -14,5 +14,5 @@ def do_connect():
     print('network config:', sta_if.ifconfig())
 
 
-do_connect()
+check_safe_mode()
 gc.collect()

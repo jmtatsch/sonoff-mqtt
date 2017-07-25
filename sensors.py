@@ -60,19 +60,22 @@ class PPD42NS(object):
             # This is the Low Pulse Occupancy Time (LPO Time)
             duration = machine.time_pulse_us(pin, pulse_level=0)
             low_pulse_occupancy += duration
-            if (utime.ticks_us() - start_time) > self.sample_time:  # sampled enough
-                break
 
-        ratio = low_pulse_occupancy / (self.sample_time * 10.0)  # FIXME: should be 100
+            if (utime.ticks_us() - start_time) > self.sample_time:
+                break  # sampled enough
+
+        ratio = low_pulse_occupancy / (self.sample_time * 10.0)
+        # FIXME: should this be 100?
         # cubic polynomial fitted to the spec sheet curve by
         # http://www.howmuchsnow.com/arduino/airquality/grovedust/
         # concentration in pcs/283ml
-        pcs_per_100th_cf = 1.1 * pow(ratio, 3) - 3.8 * pow(ratio, 2) + 520 * ratio + 0.62
+        pcs_per_100th_cf = (1.1 * pow(ratio, 3)
+                            - 3.8 * pow(ratio, 2) + 520 * ratio + 0.62)
         pcs_per_liter = pcs_per_100th_cf * 3.54
         return pcs_per_liter
 
 
-class MQ_2:
+class MQ2:
     """
     MQ-2 Smoke/Gas Sensor based on LM393
     http://arduino-info.wikispaces.com/file/view/MQ2.pdf/608272393/MQ2.pdf
@@ -111,5 +114,8 @@ class MQ_2:
         r_s = self.calculate_resistance(self.average_sample())
         rs_ro_ratio = r_s / self.r_0
         # compute the smoke concentration in ppm
-        smoke_concentration = pow(10, (((log(rs_ro_ratio) - self.smoke_curve[1]) / self.smoke_curve[2]) + self.smoke_curve[0]))
+        smoke_concentration = pow(10, (((log(rs_ro_ratio) -
+                                         self.smoke_curve[1])
+                                        / self.smoke_curve[2]) +
+                                       self.smoke_curve[0]))
         return smoke_concentration
