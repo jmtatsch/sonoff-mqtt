@@ -112,7 +112,6 @@ def relay_callback(pin):
 
 def setup():
     """Set up the IOs and connect to mqtt server."""
-    global relay, led, smoke_sensor
     button = machine.Pin(0, machine.Pin.IN)
     button.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_callback)
 

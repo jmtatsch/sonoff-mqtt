@@ -31,7 +31,7 @@ class GP2Y1010AU0F(object):
         sensor_output_voltage = 3.3 * dust_sensor_measurement / 1024
         # Formula by Christopher Nafis
         # http://www.howmuchsnow.com/arduino/airquality/dust.ino
-        dust_density = 0.17 * sensor_output_voltage - 0.1  # mg/m^3
+        # dust_density = 0.17 * sensor_output_voltage - 0.1  # mg/m^3
         # compute particles per 0.01 cubic foot by fitting with Dylos DC1100
         pcs_per_100th_cf = (sensor_output_voltage - 0.0256) * 120000
         pcs_per_liter = pcs_per_100th_cf * 3.54
@@ -85,11 +85,11 @@ class MQ2:
     Code adopted from http://sandboxelectronics.com/?p=165
     """
 
-    def __init__(self, adc):
+    def __init__(self, adc_pin=0):
         self.r_0_clean_air_factor = 9.83  # from the datasheet
         self.r_load_resistor = 5.0  # on the board in kOhm
         self.smoke_curve = [2.3, 0.53, -0.44]
-        self.adc = machine.ADC(0)
+        self.adc = machine.ADC(adc_pin)
         self.r_0 = self.calibrate()  # r_0 is the resistance in clean air
 
     def calculate_resistance(self, raw_adc):
@@ -102,7 +102,7 @@ class MQ2:
 
     def average_sample(self, samples=50, time_between_samples=500):
         sum_readings = 0
-        for i in range(samples):
+        for _ in range(samples):
             sum_readings += self.calculate_resistance(self.adc.read())
             utime.sleep_ms(time_between_samples)
         return sum_readings/samples
