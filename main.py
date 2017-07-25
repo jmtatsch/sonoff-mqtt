@@ -51,6 +51,7 @@ def topic_name(topic):
 
 def set_relay(msg):
     """Set the relay state."""
+    global relay, led
     msg = msg.decode("utf-8") if isinstance(msg, bytes) else msg
     if msg == "on":
         print("set relay on")
@@ -65,6 +66,7 @@ def set_relay(msg):
 
 def publish_relay_state():
     """Publish the relay state to a mqtt channel."""
+    global relay
     if relay.value():
         client.publish(topic_name(b"state"), b"on")
     else:
@@ -74,6 +76,7 @@ def publish_relay_state():
 
 def toggle_relay():
     """Toggle the relay state."""
+    global relay
     if relay.value():
         set_relay("off")
     else:
@@ -83,6 +86,7 @@ def toggle_relay():
 
 def get_smoke_sensor_reading():
     """Perform a smoke measurement, publish and control fan."""
+    global smoke_sensor
     smoke_concentration = smoke_sensor.measure()
     print("%f ppm smoke" % smoke_concentration)
     client.publish(topic_name(b"airquality"), smoke_concentration)
@@ -112,6 +116,7 @@ def relay_callback(pin):
 
 def setup():
     """Set up the IOs and connect to mqtt server."""
+    global relay, led, smoke_sensor
     button = machine.Pin(0, machine.Pin.IN)
     button.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_callback)
 
