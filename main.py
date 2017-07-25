@@ -17,6 +17,25 @@ machine_id = binascii.hexlify(machine.unique_id())
 print(b"Machine ID: {}".format(machine_id))
 client = None
 
+# IO Setup
+
+button = machine.Pin(0, machine.Pin.IN)
+button.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_callback)
+
+relay = machine.Pin(12, machine.Pin.OUT)
+relay.irq(trigger=machine.Pin.IRQ_FALLING, handler=relay_callback)
+
+led = machine.Pin(13, machine.Pin.OUT)  # could also be pin 2
+
+smoke_sensor = MQ2()
+
+# smoke_sensor2 = PPD42NS(0)
+# pcs_per_liter = smoke_sensor2.measure()
+# print(pcs_per_liter + " pcs/l")
+# smoke_sensor3 = GP2Y1010AU0F(0)
+# pcs_per_liter = smoke_sensor3.measure()
+# print(pcs_per_liter + " pcs/l")
+
 
 def mqtt_callback(topic, msg):
     """Handle mqtt messages from the server."""
@@ -51,6 +70,7 @@ def topic_name(topic):
 
 def set_relay(msg):
     """Set the relay state."""
+    global relay, led
     msg = msg.decode("utf-8") if isinstance(msg, bytes) else msg
     if msg == "on":
         print("set relay on")
@@ -65,6 +85,7 @@ def set_relay(msg):
 
 def publish_relay_state():
     """Publish the relay state to a mqtt channel."""
+    global relay
     if relay.value():
         client.publish(topic_name(b"state"), b"on")
     else:
@@ -74,6 +95,7 @@ def publish_relay_state():
 
 def toggle_relay():
     """Toggle the relay state."""
+    global relay
     if relay.value():
         set_relay("off")
     else:
@@ -83,6 +105,7 @@ def toggle_relay():
 
 def get_smoke_sensor_reading():
     """Perform a smoke measurement, publish and control fan."""
+    global smoke_sensor
     smoke_concentration = smoke_sensor.measure()
     print("%f ppm smoke" % smoke_concentration)
     client.publish(topic_name(b"airquality"), smoke_concentration)
@@ -108,28 +131,6 @@ def relay_callback(pin):
     """Handle relay status change."""
     print("relay switched to %i" % pin.value())
     publish_relay_state()
-
-
-def setup():
-    """Set up the IOs and connect to mqtt server."""
-    button = machine.Pin(0, machine.Pin.IN)
-    button.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_callback)
-
-    relay = machine.Pin(12, machine.Pin.OUT)
-    relay.irq(trigger=machine.Pin.IRQ_FALLING, handler=relay_callback)
-
-    led = machine.Pin(13, machine.Pin.OUT)  # could also be pin 2
-
-    smoke_sensor = MQ2()
-
-    # smoke_sensor2 = PPD42NS(0)
-    # pcs_per_liter = smoke_sensor2.measure()
-    # print(pcs_per_liter + " pcs/l")
-    # smoke_sensor3 = GP2Y1010AU0F(0)
-    # pcs_per_liter = smoke_sensor3.measure()
-    # print(pcs_per_liter + " pcs/l")
-
-    connect_and_subscribe()
 
 
 def connect_and_subscribe():
@@ -164,7 +165,7 @@ def teardown():
 
 
 if __name__ == '__main__':
-    setup()
+    connect_and_subscribe()
     try:
         main_loop()
     finally:
